@@ -53,7 +53,7 @@ from streamlit_folium import st_folium
 # ============================================================
 
 st.set_page_config(
-    page_title="Bantay-Baha",
+    page_title="Bantay-Baha | Region 5",
     page_icon="🌊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -392,7 +392,7 @@ def parse_weather_payload(payload: dict[str, Any]) -> dict[str, Any]:
 @st.cache_data(ttl=600, show_spinner=False)
 def get_weather(lat: float, lon: float) -> dict[str, Any]:
     """
-    Deliberately requests only variables needed by Bantay-Baha.
+    Deliberately requests only variables needed by Bantay-Baha | Region 5.
 
     The model derives local runoff from precipitation instead of requesting a separate runoff field.
     """
@@ -1290,7 +1290,7 @@ def make_map(
 
 def main():
     st.markdown(
-        '<div class="bb-title">🌊 Bantay-Baha</div>',
+        '<div class="bb-title">🌊 Bantay-Baha | Region 5</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -1666,7 +1666,7 @@ def main():
         st.markdown(
             f"""
             <div class="status-card" style="border-left:5px solid #334155;">
-              <div class="status-label">Bantay-Baha flood simulation</div>
+              <div class="status-label">Bantay-Baha | Region 5 flood simulation</div>
               <div class="status-main">{risk}</div>
               <div class="status-sub">
                 Max modeled depth: {fmt(max_depth, 2)} m • Affected land: {fmt(affected_percent, 1)}%
