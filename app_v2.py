@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 import requests
 import streamlit as st
 from shapely import contains_xy
-from shapely.geometry import box
+from shapely.geometry import Point, box
 from shapely.ops import unary_union
 from streamlit_folium import st_folium
 
@@ -697,12 +697,36 @@ def sample_dem(
         z10 = dem_tile[r1, c0]
         z11 = dem_tile[r1, c1]
 
-        out[mask] = (
-            z00 * (1 - fr) * (1 - fc)
-            + z01 * (1 - fr) * fc
-            + z10 * fr * (1 - fc)
-            + z11 * fr * fc
+        weights = np.stack(
+            [
+                (1 - fr) * (1 - fc),
+                (1 - fr) * fc,
+                fr * (1 - fc),
+                fr * fc,
+            ],
+            axis=0,
         )
+        values = np.stack(
+            [z00, z01, z10, z11],
+            axis=0,
+        )
+        valid = np.isfinite(values)
+        weighted_values = np.where(valid, values, 0.0) * weights
+        weight_sum = np.sum(
+            np.where(valid, weights, 0.0),
+            axis=0,
+        )
+        sampled = np.full(
+            weight_sum.shape,
+            np.nan,
+            dtype=np.float32,
+        )
+        good = weight_sum > 0
+        sampled[good] = (
+            np.sum(weighted_values, axis=0)[good]
+            / weight_sum[good]
+        )
+        out[mask] = sampled
 
     return out
 
@@ -1739,26 +1763,54 @@ def main():
             click_lat = point["lat"]
             click_lon = point["lon"]
 
+            # Classify the actual clicked coordinate against the
+            # Natural Earth geometry first. Do not infer land/sea
+            # from the nearest raster cell: a click near a coastline
+            # can legitimately snap to an adjacent ocean cell.
+            land_geometry = get_land_geometry()
+            on_land = bool(
+                land_geometry.covers(
+                    Point(click_lon, click_lat)
+                )
+            )
+
             distance2 = (
                 (lat_grid - click_lat) ** 2
                 + (lon_grid - click_lon) ** 2
             )
 
-            point_row, point_col = np.unravel_index(
-                int(np.nanargmin(distance2)),
-                distance2.shape,
-            )
+            if on_land:
+                candidate = (
+                    land_mask
+                    & np.isfinite(dem)
+                )
+                if candidate.any():
+                    candidate_distance2 = np.where(
+                        candidate,
+                        distance2,
+                        np.inf,
+                    )
+                    point_row, point_col = np.unravel_index(
+                        int(np.argmin(candidate_distance2)),
+                        candidate_distance2.shape,
+                    )
+                else:
+                    point_row, point_col = np.unravel_index(
+                        int(np.argmin(distance2)),
+                        distance2.shape,
+                    )
 
-            on_land = bool(
-                land_mask[point_row, point_col]
-                and np.isfinite(dem[point_row, point_col])
-            )
-
-            elevation_value = (
-                float(dem[point_row, point_col])
-                if on_land
-                else None
-            )
+                elevation_value = (
+                    float(dem[point_row, point_col])
+                    if np.isfinite(dem[point_row, point_col])
+                    else None
+                )
+            else:
+                point_row, point_col = np.unravel_index(
+                    int(np.argmin(distance2)),
+                    distance2.shape,
+                )
+                elevation_value = None
 
             depth_value = (
                 float(depth[point_row, point_col])
