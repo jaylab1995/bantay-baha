@@ -542,8 +542,7 @@ def srtm_tile_name(lat: float, lon: float) -> str:
 
 
 def srtm_directory(lat: int) -> str:
-    band = (abs(lat) // 10) * 10
-    return f"{'N' if lat >= 0 else 'S'}{band:02d}"
+    return f"{'N' if lat >= 0 else 'S'}{abs(lat):02d}"
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -658,7 +657,8 @@ def sample_dem(
 
         try:
             dem_tile = read_srtm_tile(tile)
-        except Exception:
+        except Exception as exc:
+            st.warning(f"SRTM tile {tile} failed: {exc}")
             continue
 
         mask = (
